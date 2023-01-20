@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-connect-bigquery-sink
+  namespace: data
+spec:
+  source:
+    targetRevision: 3.29.6
+    helm:
+      parameters:
+        - name: kafkaConnect.replicaCount
+          value: '3'
+        - name: kafkaConnect.configurationOverrides.group.id
+          value: kafka-connect-bigquery-sink-2
+        - name: kafkaConnect.extraVolumes[0].secret.secretName
+          value: kafka-connect-secret-data-lake-dev-8dc2
+        - name: kafkaConnectConnectorService.gcpProject
+          value: "data-lake-dev-8dc2"
+        - name: kafkaConnectMonitorService.enabled
+          value: 'true'
+        - name: kafkaConnectConnectorService.image.tag
+          value: "0.9.0"
+        - name: kafkaConnectConnectorService.connectorsConfigurationsSubsets
+          value: '{"mettle-business-events-v2": {"consumer.group.id.version": 6, "schema.registry": "mettle"}}'

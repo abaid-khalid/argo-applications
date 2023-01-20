@@ -1,0 +1,141 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  labels:
+    app.kubernetes.io/instance: kafka-connect-bigquery-sink
+  name: kafka-connect-bigquery-sink
+  namespace: data
+spec:
+  destination:
+    namespace: data
+    server: https://kubernetes.default.svc
+  project: chapter-data-engineering
+  source:
+    repoURL: https://mettle-charts.storage.googleapis.com
+    targetRevision: 3.29.3
+    chart: kafka-connect
+    helm:
+      values: |
+        fullnameOverride: kafka-connect-bigquery-sink
+        perimener:
+          image:
+            repository: eu.gcr.io/mettle-bank/perimener
+            tag: 1.1.265
+        kafkaConnect:
+          image:
+            repository: eu.gcr.io/eevee-bank/docker-kafka-connect
+            tag: 1.3.168
+          imagePullSecretName: gcr-private-image-pull-secret
+          resources:
+            limits:
+              memory: 2Gi
+            requests:
+              memory: 1Gi
+          heapOptions: "-Xms1G -Xmx1G"
+          configurationOverrides:
+            "group.id": "kafka-connect-bigquery-sink"
+            "config.storage.topic": "data-kafka-connect-bigquery-storage"
+            "offset.storage.topic": "data-kafka-connect-bigquery-offsets"
+            "status.storage.topic": "data-kafka-connect-bigquery-status"
+            "connector.client.config.override.policy": "All"
+            "key.converter": "org.apache.kafka.connect.storage.StringConverter"
+            "value.converter": "io.confluent.connect.avro.AvroConverter"
+            "value.converter.schema.registry.url": "http://schema-registry.confluent.svc.cluster.local:8081"
+            "key.converter.schema.registry.url": "http://schema-registry.confluent.svc.cluster.local:8081"
+          extraVolumes:
+            - name: kafka-connect-secret
+              secret:
+                secretName: some-secret
+                items:
+                  - key: credentials.json
+                    path: credentials.json
+          extraVolumeMounts:
+            - name: kafka-connect-secret
+              mountPath: "/etc/creds-volume"
+              readOnly: true
+          podAnnotations:
+            # Excluding all logs from DD temporarily. On error scenarios kafka-connect floods error logs which is problematic.
+            # Can remove once solution is in place.
+            ad.datadoghq.com/kafka-connect-bigquery-sink.logs: >-
+              [{
+                "log_processing_rules": [{
+                  "type": "exclude_at_match",
+                  "name": "exclude_all",
+                  "pattern" : ".*"
+                }]
+              }]
+            ad.datadoghq.com/kafka-connect-bigquery-sink.check_names: >-
+              ["openmetrics"]
+            ad.datadoghq.com/kafka-connect-bigquery-sink.init_configs: >-
+              [{}]
+            ad.datadoghq.com/kafka-connect-bigquery-sink.instances: >-
+              [
+                {
+                  "collect_counters_with_distributions": true,
+                  "openmetrics_endpoint": "http://%%host%%:5556/prometheus",
+                  "namespace": "data",
+                  "metrics": [
+                    {"kafka_connect_connector_status": "kafka.connect.connector.status"},
+                    {"kafka_connect_worker_connector_failed_task_count": "kafka.connect.worker.connector.failed.task.count"},
+                    {"kafka_connect_worker_connector_running_task_count": "kafka.connect.worker.connector.running.task.count"},
+                    {"kafka_connect_worker_connector_unassigned_task_count": "kafka.connect.worker.connector.unassigned.task.count"},
+                    {"kafka_connect_start_time_seconds": "kafka.connect.start.time.seconds"},
+                    {"kafka_connect_task_error_total_errors_logged": "kafka.connect.task.error.total.errors.logged"},
+                    {"kafka_connect_task_error_total_record_errors": "kafka.connect.task.error.total.record.errors"},
+                    {"kafka_connect_task_error_total_record_failures": "kafka.connect.task.error.total.record.failures"},
+                    {"kafka_connect_task_error_total_retries": "kafka.connect.task.error.total.retries"},
+                    {"kafka_connect_sink_task_sink_record_read_total": "kafka.connect.sink.task.sink.record.read.total"},
+                    {"kafka_connect_sink_task_sink_record_send_total": "kafka.connect.sink.task.sink.record.send.total"},
+                    {"kafka_connect_connection_count": "kafka.connect.connection.count"},
+                    {"kafka_connect_connector_task_offset_commit_success_percentage": "kafka.connect.connector.task.offset.commit.success.percentage"},
+                    {"kafka_connect_task_error_deadletterqueue_produce_requests": "kafka.connect.task.error.deadletterqueue.produce.requests"},
+                    {"kafka_connect_task_error_last_error_timestamp": "kafka.connect.task.error.last.error.timestamp"},
+                    {"kafka_connect_worker_connector_startup_failure_total": "kafka.connect.worker.connector.startup.failure.total"},
+                    {"kafka_connect_worker_connector_startup_failure_percentage": "kafka.connect.worker.connector.startup.failure.percentage"},
+                    {"kafka_connect_worker_rebalance_rebalancing": "kafka.connect.worker.rebalance.rebalancing"},
+                    {"kafka_connect_worker_connector_count": "kafka.connect.worker.connector.count"},
+                    {"kafka_connect_sink_task_offset_commit_completion_total": "kafka.connect.sink.task.offset.commit.completion.total"},
+                    {"kafka_connect_sink_task_offset_commit_skip_total": "kafka.connect.sink.task.offset.commit.skip.total"}
+                  ]
+                }
+              ]
+        kafkaConnectConnectorService:
+          enabled: true
+          image:
+            repository: eu.gcr.io/eevee-bank/data-kafka-connect-connector-service
+            tag: 0.5.0
+          imagePullSecretName: gcr-private-image-pull-secret
+          logLevel: "debug"
+          kafkaConnectUrl: "http://kafka-connect-bigquery-sink.data.svc.cluster.local:8083"
+          schemaRegistryUrl: "http://schema-registry.confluent.svc.cluster.local:8081"
+          keyFilePath: "/etc/creds-volume/credentials.json"
+          gcpProject: "gcp_project"
+          connectorsConfigurationsSubsets: '{}'
+          perimener:
+            env:
+              EXPECTED_READY_POD_COUNT: 3
+              NAMESPACE: "data"
+              POD_LABEL: "app_name=kafka-connect-bigquery-sink"
+              RANDOM_WINDOW_SECONDS: "0"
+        kafkaConnectMonitorService:
+          enabled: false
+          image:
+            repository: eu.gcr.io/eevee-bank/data-kafka-connect-monitor-service
+            tag: 0.2.0
+          imagePullSecretName: gcr-private-image-pull-secret
+          logLevel: "debug"
+          kafkaConnectUrl: "http://kafka-connect-bigquery-sink.data.svc.cluster.local:8083"
+        kafkaConnectInjector:
+          enabled: false
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+      limit: 5
