@@ -1,0 +1,2 @@
+# argo-applications
+ArgoCD Applications
