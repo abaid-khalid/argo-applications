@@ -87,8 +87,8 @@ kafkaConnect:
 kafkaConnectConnectorService:  # Service which configures connectors with bigquery sink configurations onto kafka connect
 
   image:
-    repository: localhost:5000/connector-service
-    tag: 0.1.0
+    repository: eu.gcr.io/google-containers/python
+    tag: v1
     pullPolicy: IfNotPresent
 
 
