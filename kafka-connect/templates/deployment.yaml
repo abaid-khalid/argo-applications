@@ -45,7 +45,7 @@ spec:
             - name: GCP_PROJECT
               value: "{{ .Values.kafkaConnectConnectorService.gcpProject }}"
             - name: CONNECTORS_CONFIGURATIONS_SUBSETS
-              value: '{{ .Values.kafkaConnectConnectorService.connectorsConfigurationsSubsets }}'
+              value: '{{ toJson .Values.kafkaConnectConnectorService.connectorsConfigurationsSubsets }}'
           {{- if .Values.securityContexts.kafkaConnectConnectorService}}
           securityContext:
 {{ toYaml .Values.securityContexts.kafkaConnectConnectorService | indent 12 }}

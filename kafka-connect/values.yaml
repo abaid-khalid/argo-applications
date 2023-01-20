@@ -97,7 +97,13 @@ kafkaConnectConnectorService:  # Service which configures connectors with bigque
   schemaRegistryUrl: "http://localhost:8081"
   keyFilePath: "/etc/creds-volume/key.json"
   gcpProject: "gcp_project"
-  connectorsConfigurationsSubsets: {}
+  connectorsConfigurationsSubsets:
+    connector_a:
+      schema.registry: "mettle"
+      version: 6
+    connector_b:
+      schema.registry: "genie"
+      version: 12
 
   extraInitContainers: []
 
