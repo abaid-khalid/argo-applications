@@ -87,14 +87,10 @@ kafkaConnect:
 kafkaConnectConnectorService:  # Service which configures connectors with bigquery sink configurations onto kafka connect
 
   image:
-    repository: eu.gcr.io/eevee-bank/data-kafka-connect-connector-service
-    tag: 0.2.0
+    repository: localhost:5000/connector-service
+    tag: 0.1.0
     pullPolicy: IfNotPresent
 
-  # The Kubernetes secret used to allow pulling the image from a private image registry.
-  # This defaults to a blank string so that it is not used by default.
-  imagePullSecretName: ""
-  serviceAccountName: ""
 
   logLevel: "info"
   kafkaConnectUrl: "http://kafka-connect.confluent.svc.cluster.local:8083"
@@ -102,13 +98,6 @@ kafkaConnectConnectorService:  # Service which configures connectors with bigque
   keyFilePath: "/etc/creds-volume/key.json"
   gcpProject: "gcp_project"
   connectorsConfigurationsSubsets: {}
-
-  perimener:
-    env:
-      EXPECTED_READY_POD_COUNT: 3
-      NAMESPACE: "confluent"
-      POD_LABEL: "app_name=kafka-connect"
-      RANDOM_WINDOW_SECONDS: "0"
 
   extraInitContainers: []
 

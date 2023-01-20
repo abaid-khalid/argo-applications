@@ -24,32 +24,7 @@ spec:
       securityContext:
 {{ toYaml .Values.podSecurityContext | indent 8 }}
       {{- end }}
-      {{- if .Values.kafkaConnectConnectorService.imagePullSecretName }}
-      imagePullSecrets:
-        - name: {{ .Values.kafkaConnectConnectorService.imagePullSecretName }}
-      {{- end }}
-      {{- if .Values.kafkaConnectConnectorService.serviceAccountName }}
-      serviceAccountName: {{ .Values.kafkaConnectConnectorService.serviceAccountName }}
-      {{- else }}
-      serviceAccountName: {{ .Release.Name }}
-      {{- end }}
       restartPolicy: Never
-      initContainers:
-        - name: wait-for-kafka-connect
-          image: "{{ .Values.perimener.image.repository }}:{{ .Values.perimener.image.tag }}"
-          imagePullPolicy: {{ .Values.perimener.image.pullPolicy }}
-          env:
-            {{- range $key, $value := $.Values.kafkaConnectConnectorService.perimener.env }}
-            - name: "{{ $key }}"
-              value: "{{ $value }}"
-            {{- end }}
-          {{- if .Values.securityContexts.kafkaConnect}}
-          securityContext:
-{{ toYaml .Values.securityContexts.kafkaConnect | indent 12 }}
-          {{- end }}
-        {{- if .Values.kafkaConnectConnectorService.extraInitContainers }}
-        {{- .Values.kafkaConnectConnectorService.extraInitContainers | toYaml | nindent 8 }}
-        {{- end }}
       containers:
         - name: {{ .Release.Name }}-connector-service
           image: "{{ .Values.kafkaConnectConnectorService.image.repository }}:{{ .Values.kafkaConnectConnectorService.image.tag }}"
