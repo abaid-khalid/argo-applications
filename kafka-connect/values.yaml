@@ -1,0 +1,149 @@
+perimener:
+  image:
+    repository: eu.gcr.io/mettle-bank/perimener
+    tag: 1.1.265
+    pullPolicy: IfNotPresent
+
+kafkaConnect:
+  replicaCount: 3
+
+  # We use a custom maintained image because we overlay the spreadfast s3 connector onto the default confluent image.
+  image:
+    repository: eu.gcr.io/eevee-bank/docker-kafka-connect
+    tag: 1.3.164
+    pullPolicy: IfNotPresent
+
+  restart: "not-applicable"
+
+  # The Kubernetes secret used to allow pulling the image from a private image registry.
+  # This defaults to a blank string so that it is not used by default.
+  imagePullSecretEnabled: true
+  serviceAccountName: ""
+  imagePullSecretName: ""
+
+  servicePort: 8083
+
+  kafka:
+    endpoint: kafka.confluent.svc.cluster.local:9092
+
+  configurationOverrides:
+    "group.id": "kafka-connect"
+    "config.storage.topic": "connect-storage"
+    "offset.storage.topic": "connect-offsets"
+    "status.storage.topic": "connect-status"
+    "plugin.path": "/usr/share/java,/usr/share/confluent-hub-components"
+    "key.converter": "org.apache.kafka.connect.converters.ByteArrayConverter"
+    "value.converter": "org.apache.kafka.connect.converters.ByteArrayConverter"
+    "key.converter.schemas.enable": "false"
+    "value.converter.schemas.enable": "false"
+    "internal.key.converter": "org.apache.kafka.connect.json.JsonConverter"
+    "internal.value.converter": "org.apache.kafka.connect.json.JsonConverter"
+    "config.storage.replication.factor": "3"
+    "offset.storage.replication.factor": "3"
+    "status.storage.replication.factor": "3"
+    "consumer.auto.offset.reset": "earliest"
+
+  producerSSLConfiguration: {}
+
+  consumerSSLConfiguration: {}
+
+  heapOptions: "-Xms512M -Xmx512M"
+
+  customEnv: {}
+
+  resources: {}
+
+  podAnnotations: {}
+
+  nodeSelector: {}
+
+  tolerations: {}
+
+  jmxAdditionalConfigmap: []
+
+  extraVolumes: []
+    # - name: test-volume
+    #   emptyDir: {}
+    # - name: secret-volume
+    #   secretName: secret-name
+    #   items:
+    #     - key: foo
+    #       path: far
+  extraVolumeMounts: []
+    # - name: test-volume-mount
+    #   mountPath: /some/path
+    #   readOnly: true
+
+  priorityClassName: mettle-cluster-critical
+
+  kafimener:
+    image:
+      repository: eu.gcr.io/mettle-bank/kafimener
+      tag: 1.1.43
+      pullPolicy: IfNotPresent
+    topicsToBlockOn: "connect-offsets"
+
+
+kafkaConnectConnectorService:  # Service which configures connectors with bigquery sink configurations onto kafka connect
+
+  image:
+    repository: eu.gcr.io/eevee-bank/data-kafka-connect-connector-service
+    tag: 0.2.0
+    pullPolicy: IfNotPresent
+
+  # The Kubernetes secret used to allow pulling the image from a private image registry.
+  # This defaults to a blank string so that it is not used by default.
+  imagePullSecretName: ""
+  serviceAccountName: ""
+
+  logLevel: "info"
+  kafkaConnectUrl: "http://kafka-connect.confluent.svc.cluster.local:8083"
+  schemaRegistryUrl: "http://localhost:8081"
+  keyFilePath: "/etc/creds-volume/key.json"
+  gcpProject: "gcp_project"
+  connectorsConfigurationsSubsets: {}
+
+  perimener:
+    env:
+      EXPECTED_READY_POD_COUNT: 3
+      NAMESPACE: "confluent"
+      POD_LABEL: "app_name=kafka-connect"
+      RANDOM_WINDOW_SECONDS: "0"
+
+  extraInitContainers: []
+
+  resources: {}
+
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContexts:
+  waitForTopics:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  kafkaConnect:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  keepAlive:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  kafkaCertificateRotator:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  mtlsCertificateProvisioner:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+  kafkaConnectConnectorService:
+    readOnlyRootFilesystem: false
+  kafkaConnectMonitorService:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+
+serviceAccount:
+  annotations: {}
+
+podLabels: {}

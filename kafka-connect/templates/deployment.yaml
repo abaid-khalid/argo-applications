@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-connector-service-hook
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app_name: {{ .Release.Name }}-connector-service
+    app_version: {{ .Values.kafkaConnectConnectorService.image.tag }}
+    maintained_by: mettle
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 30
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app_name: {{ .Release.Name }}-connector-service
+        app_version: {{ .Values.kafkaConnectConnectorService.image.tag }}
+        maintained_by: mettle
+    spec:
+      {{- if .Values.podSecurityContext }}
+      securityContext:
+{{ toYaml .Values.podSecurityContext | indent 8 }}
+      {{- end }}
+      {{- if .Values.kafkaConnectConnectorService.imagePullSecretName }}
+      imagePullSecrets:
+        - name: {{ .Values.kafkaConnectConnectorService.imagePullSecretName }}
+      {{- end }}
+      {{- if .Values.kafkaConnectConnectorService.serviceAccountName }}
+      serviceAccountName: {{ .Values.kafkaConnectConnectorService.serviceAccountName }}
+      {{- else }}
+      serviceAccountName: {{ .Release.Name }}
+      {{- end }}
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-kafka-connect
+          image: "{{ .Values.perimener.image.repository }}:{{ .Values.perimener.image.tag }}"
+          imagePullPolicy: {{ .Values.perimener.image.pullPolicy }}
+          env:
+            {{- range $key, $value := $.Values.kafkaConnectConnectorService.perimener.env }}
+            - name: "{{ $key }}"
+              value: "{{ $value }}"
+            {{- end }}
+          {{- if .Values.securityContexts.kafkaConnect}}
+          securityContext:
+{{ toYaml .Values.securityContexts.kafkaConnect | indent 12 }}
+          {{- end }}
+        {{- if .Values.kafkaConnectConnectorService.extraInitContainers }}
+        {{- .Values.kafkaConnectConnectorService.extraInitContainers | toYaml | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-connector-service
+          image: "{{ .Values.kafkaConnectConnectorService.image.repository }}:{{ .Values.kafkaConnectConnectorService.image.tag }}"
+          imagePullPolicy: {{ .Values.kafkaConnectConnectorService.image.pullPolicy }}
+          resources: {{ toYaml .Values.kafkaConnectConnectorService.resources | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            - name: LOG_LEVEL
+              value: "{{ .Values.kafkaConnectConnectorService.logLevel }}"
+            - name: KAFKA_CONNECT_URL
+              value: "{{ .Values.kafkaConnectConnectorService.kafkaConnectUrl }}"
+            - name: SCHEMA_REGISTRY_URL
+              value: "{{ .Values.kafkaConnectConnectorService.schemaRegistryUrl }}"
+            - name: KEY_FILE_PATH
+              value: "{{ .Values.kafkaConnectConnectorService.keyFilePath }}"
+            - name: GCP_PROJECT
+              value: "{{ .Values.kafkaConnectConnectorService.gcpProject }}"
+            - name: CONNECTORS_CONFIGURATIONS_SUBSETS
+              value: '{{ .Values.kafkaConnectConnectorService.connectorsConfigurationsSubsets }}'
+          {{- if .Values.securityContexts.kafkaConnectConnectorService}}
+          securityContext:
+{{ toYaml .Values.securityContexts.kafkaConnectConnectorService | indent 12 }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

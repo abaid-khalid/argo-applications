@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app_name: {{ .Release.Name }}
+    app_version: {{ .Values.kafkaConnect.image.tag }}
+    maintained_by: mettle
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.kafkaConnect.servicePort }}
+      targetPort: {{ .Values.kafkaConnect.servicePort }}
+  selector:
+    app_name: {{ .Release.Name }}
